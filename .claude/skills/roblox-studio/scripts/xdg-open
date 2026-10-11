@@ -1,0 +1,20 @@
+#!/bin/bash
+# Installed as /usr/local/bin/xdg-open by install.sh.
+# Wine's winebrowser and Chromium hand URLs to xdg-open. Route them:
+#   roblox-studio-auth: / roblox-studio:  -> Roblox Studio under Wine
+#   http(s)                               -> the container's Chromium
+# Every URL is also logged so it can be read back with `rs.sh urls`.
+url="$1"
+echo "$(date -Is) $url" >> /tmp/roblox-opened-urls.log
+export DISPLAY="${DISPLAY:-:99}" WINEPREFIX="${WINEPREFIX:-$HOME/.wine-roblox}" WINEDEBUG=-all
+RS_HOME="${RS_HOME:-$HOME/.local/share/roblox-studio}"
+case "$url" in
+  roblox-studio-auth:*|roblox-studio:*)
+    studio=$(ls -d "$RS_HOME"/versions/version-*/ 2>/dev/null | tail -1)
+    cd "$studio" && exec wine RobloxStudioBeta.exe "$url" >> /tmp/roblox-protocol.log 2>&1 ;;
+  http://*|https://*)
+    chrome=$(ls /opt/pw-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | tail -1)
+    chrome=${chrome:-$(command -v chromium || command -v google-chrome)}
+    [ -n "$chrome" ] || exit 0
+    exec "$chrome" --no-sandbox --user-data-dir="$RS_HOME/chromium-profile" "$url" >/dev/null 2>&1 ;;
+esac
